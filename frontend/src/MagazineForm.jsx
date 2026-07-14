@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import api from './api/axiosConfig';
 
-function MagazineForm({ token, onMagazineAdded }) {
+function MagazineForm({ onMagazineAdded }) {  // Remove 'token' prop
     const [title, setTitle] = useState('');
     const [price, setPrice] = useState(0.0);
     const [copies, setCopies] = useState(10);
@@ -15,32 +16,25 @@ function MagazineForm({ token, onMagazineAdded }) {
             issueNumber: parseInt(issueNumber)
         };
 
-        fetch('/api/rest/magazines', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(newMagazine),
-        })
+        // Use api.post instead of fetch - Axios automatically adds the token!
+        api.post('/rest/magazines', newMagazine)
             .then(response => {
-                if(!response.ok) throw new Error('Could not save magazine.');
-                return response.json();
-            })
-            .then(savedMagazine => {
                 alert('Magazine Saved!');
-                onMagazineAdded(savedMagazine);
+                onMagazineAdded(response.data);
                 setTitle('');
                 setPrice(0.0);
                 setCopies(10);
                 setIssueNumber(1);
             })
-            .catch(err => alert(err.message));
+            .catch(err => {
+                console.error('Save Error:', err);
+                alert('Unauthorized: You do not have permission to add magazines.');
+            });
     };
 
     return (
         <form onSubmit={handleSubmit} style={{ border: '2px solid green', padding: '20px', marginBottom: '20px', borderRadius: '8px' }}>
-            <h3>Add New Magazine</h3>
+            <h3>Add New Magazine (Secured via Axios)</h3>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <input
                     type="text"

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useAuth } from './provider/AuthProvider';
 
 function Book({ id, title, author, price, onDelete, onUpdate }) {
+    const { isAdmin } = useAuth();  // ← Get admin status from AuthProvider
     const [isEditing, setIsEditing] = useState(false);
     const [tempTitle, setTempTitle] = useState(title);
     const [tempAuthor, setTempAuthor] = useState(author);
@@ -35,10 +37,13 @@ function Book({ id, title, author, price, onDelete, onUpdate }) {
                 <h3>{title}</h3>
                 <p><strong>Author:</strong> {author} | <strong>Price:</strong> ${Number(price).toFixed(2)}</p>
             </div>
-            <div className="book-actions">
-                <button onClick={() => setIsEditing(true)} style={{ backgroundColor: '#ffc107', marginRight: '5px', cursor: 'pointer' }}>Edit</button>
-                <button onClick={() => onDelete(id)} style={{ backgroundColor: '#ff4444', color: 'white', cursor: 'pointer' }}>Delete</button>
-            </div>
+            {/* RBAC: Only show Edit/Delete buttons if user is Admin */}
+            {isAdmin && (
+                <div className="book-actions">
+                    <button onClick={() => setIsEditing(true)} style={{ backgroundColor: '#ffc107', marginRight: '5px', cursor: 'pointer' }}>Edit</button>
+                    <button onClick={() => onDelete(id)} style={{ backgroundColor: '#ff4444', color: 'white', cursor: 'pointer' }}>Delete</button>
+                </div>
+            )}
         </div>
     );
 }
