@@ -1,73 +1,98 @@
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from "react";
 
-// Create the Context
 const AuthContext = createContext(null);
 
-// Custom hook to use the AuthContext
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
+        throw new Error("useAuth must be used inside AuthProvider");
     }
     return context;
 };
 
-// AuthProvider Component - The Global Security Brain
 export const AuthProvider = ({ children }) => {
-    const [token, setToken] = useState(null);
+
+    const [token, setTokenState] = useState(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Decode JWT to extract roles from the "scope" claim
     const decodeToken = (jwt) => {
         try {
-            // JWT format: header.payload.signature
-            const payload = jwt.split('.')[1];
-            const decoded = JSON.parse(atob(payload));
+            const payload = jwt.split(".")[1];
+            const decoded = JSON.parse(window.atob(payload));
 
-            // Check if the scope contains ADMIN
-            const scope = decoded.scope || '';
-            const isAdminUser = scope.includes('ROLE_ADMIN') || scope.includes('ADMIN');
+            if (decoded.exp && Date.now() >= decoded.exp * 1000) {
+                console.warn("Token is expired locally (exp claim in the past)");
+                return { payload: null, isAdmin: false };
+            }
 
-            return { isAdmin: isAdminUser, payload: decoded };
+            const scope =
+                decoded.scope ||
+                decoded.authorities ||
+                decoded.role ||
+                decoded.roles ||
+                "";
+
+            const admin = String(scope).toUpperCase().includes("ADMIN");
+
+            return { payload: decoded, isAdmin: admin };
+
         } catch (error) {
-            console.error('Failed to decode token:', error);
-            return { isAdmin: false, payload: null };
+            console.error("Invalid JWT:", error);
+            return { payload: null, isAdmin: false };
         }
     };
 
-    // Check localStorage for existing token on app load
-    useEffect(() => {
-        const storedToken = localStorage.getItem('token');
-        if (storedToken) {
-            const { isAdmin: adminStatus } = decodeToken(storedToken);
-            setToken(storedToken);
-            setIsAdmin(adminStatus);
+    const setToken = (newToken) => {
+        console.log("Saving token:", newToken);
+
+        if (!newToken) {
+            localStorage.removeItem("token");
+            setTokenState(null);
+            setIsAdmin(false);
+            return;
         }
+
+        const decoded = decodeToken(newToken);
+
+        if (!decoded.payload) {
+            localStorage.removeItem("token");
+            setTokenState(null);
+            setIsAdmin(false);
+            console.error("Refused to store an invalid/expired token");
+            return;
+        }
+
+        localStorage.setItem("token", newToken);
+        setTokenState(newToken);
+        setIsAdmin(decoded.isAdmin);
+    };
+
+    useEffect(() => {
+        const savedToken = localStorage.getItem("token");
+
+        if (savedToken) {
+            const decoded = decodeToken(savedToken);
+
+            if (decoded.payload) {
+                setTokenState(savedToken);
+                setIsAdmin(decoded.isAdmin);
+            } else {
+                localStorage.removeItem("token");
+            }
+        }
+
         setLoading(false);
     }, []);
 
-    // Update localStorage whenever token changes
-    useEffect(() => {
-        if (token) {
-            localStorage.setItem('token', token);
-            const { isAdmin: adminStatus } = decodeToken(token);
-            setIsAdmin(adminStatus);
-        } else {
-            localStorage.removeItem('token');
-            setIsAdmin(false);
-        }
-    }, [token]);
-
-    // Logout function
     const logout = () => {
-        setToken(null);
-        localStorage.removeItem('token');
-        window.location.href = '/';
+        localStorage.removeItem("token");
+        setTokenState(null);
+        setIsAdmin(false);
+        window.location.href = "/";
     };
 
-    // Memoize the context value to prevent unnecessary re-renders
-    const contextValue = useMemo(() => ({
+    const value = useMemo(() => ({
         token,
         setToken,
         isAdmin,
@@ -76,7 +101,7 @@ export const AuthProvider = ({ children }) => {
     }), [token, isAdmin, loading]);
 
     return (
-        <AuthContext.Provider value={contextValue}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
